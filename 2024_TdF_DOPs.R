@@ -109,7 +109,7 @@ lapply(1:21, function(ii) {
   m <- tm_shape(bm) +
     tm_rgb() +
     tm_shape(r, bbox = st_bbox(x)) +
-    tm_lines() +
+    tm_lines(lwd = 2) +
     tm_shape(p) +
     tm_fill("PDOnam", 
             title = "Protected Designation of Origins",
