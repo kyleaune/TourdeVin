@@ -2,7 +2,16 @@ pkgs <- c("tidyverse", "XML", "sf", "basemaps", "tmap", "ggplot2")
 
 lapply(pkgs, library, character.only = TRUE, verbose = FALSE)
 
-# Read in DPO regions
+# Read in AOC regions (France only)
+aoc <- st_read("2024-06-10_delim-parcellaire-aoc-shp.shp") %>%
+  st_transform(3035)
+
+# Aggregating to 'denom' column geometry
+aoc.agg <- aoc %>%
+  group_by(denom) %>%
+  summarize(do_union = TRUE)
+
+# Read in DPO regions (EU-wide)
 rnames <- read.csv("PDO_EU_id.csv")
 regions <- st_read("EU_PDO.gpkg") %>%
   left_join(rnames[, c("Country", "PDOid", "PDOnam")], by = "PDOid") %>%
@@ -41,8 +50,8 @@ route <- lapply(1:21, function(s) {
   return(sf)
 })
 
-# Identify DPO's on stage route
-route.dpo <- lapply(route, function(sf) {
+# Identify PDO's on stage route
+route.pdo <- lapply(route, function(sf) {
   int <- st_intersection(sf, regions)
   
   if (nrow(int) == 0) {
@@ -72,11 +81,19 @@ route.dpo <- lapply(route, function(sf) {
 })
 
 # Attaching stage number to results
-names(route.dpo) <- paste("Stage", 1:21)
+names(route.pdo) <- paste("Stage", 4:21)
 
 for (ii in 1:21) {
-  route.dpo[[ii]]$stage <- ii
+  route.pdo[[ii]]$stage <- ii
 }
+
+# # Grouping DPOs on routes with >10 regions
+# toomanydpos.l <- route.dpo[which(unlist(lapply(route.dpo, nrow)) > 10)]
+# toomanydpos <- lapply(toomanydpos.l, st_drop_geometry) %>%
+#   bind_rows()
+# 
+# # Manually coding DPOs into region
+# write.csv(toomanydpos, "dpo_manual_code.csv")
 
 # Mapping DPOs of each stage
 lapply(1:21, function(ii) { 
@@ -101,7 +118,7 @@ lapply(1:21, function(ii) {
   
   # Subsetting DPO region polygons for those in the route area
   p <- regions %>%
-    filter(PDOid %in% route.dpo[[ii]]$PDOid) %>%
+    filter(PDOid %in% route.pdo[[ii]]$PDOid) %>%
     st_transform(3857) %>%
     st_crop(x)
   
@@ -111,8 +128,8 @@ lapply(1:21, function(ii) {
     tm_shape(r, bbox = st_bbox(x)) +
     tm_lines(lwd = 2) +
     tm_shape(p) +
-    tm_fill("PDOnam", 
-            title = "Protected Designation of Origins",
+    tm_fill("denom", 
+            title = "Appellation d'Origen Controllee",
             alpha = 0.5) +
     tm_borders(col = "grey50") +
     tm_shape(r, bbox = st_bbox(x)) +
